@@ -1,0 +1,193 @@
+[
+  {
+    "description": "Navixy Report Page schema – core happy/edge cases (v1.1.0, includes charts)",
+    "schema": { "$ref": "../schema/report-page.schema.json" },
+    "tests": [
+      {
+        "description": "VALID – minimal report (annotation only)",
+        "data": {
+          "title": "Notes only",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u1", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "annotation",
+              "visuals": [
+                { "kind": "annotation", "options": { "text": "Hello", "markdown": false } }
+              ]
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "VALID – tiles row with single KPI",
+        "data": {
+          "title": "KPI sample",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u2", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "tiles",
+              "visuals": [
+                {
+                  "kind": "tile",
+                  "label": "Moving",
+                  "query": { "sql": "SELECT 1 AS value" },
+                  "verify": {
+                    "row_count": { "eq": 1 },
+                    "columns": [{ "name": "value", "type": "integer" }]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "VALID – charts row with bar",
+        "data": {
+          "title": "Charts OK",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u3", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "charts",
+              "visuals": [
+                {
+                  "kind": "bar",
+                  "label": "By status",
+                  "query": { "sql": "SELECT 'moving' AS category, 5 AS value" },
+                  "options": {
+                    "category_field": "category",
+                    "value_field": "value",
+                    "orientation": "vertical"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "VALID – table row basic",
+        "data": {
+          "title": "Inventory",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u4", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "table",
+              "visuals": [
+                {
+                  "kind": "table",
+                  "label": "Vehicles",
+                  "query": { "sql": "SELECT 1 AS id" },
+                  "verify": { "row_count": { "min": 0 }, "columns": [{ "name": "id", "type": "integer" }] }
+                }
+              ]
+            }
+          ]
+        },
+        "valid": true
+      },
+      {
+        "description": "INVALID – tiles row has > 3 visuals",
+        "data": {
+          "title": "Too many tiles",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u5", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "tiles",
+              "visuals": [
+                { "kind": "tile", "label": "A", "query": { "sql": "SELECT 1" } },
+                { "kind": "tile", "label": "B", "query": { "sql": "SELECT 1" } },
+                { "kind": "tile", "label": "C", "query": { "sql": "SELECT 1" } },
+                { "kind": "tile", "label": "D", "query": { "sql": "SELECT 1" } }
+              ]
+            }
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "INVALID – color not hex",
+        "data": {
+          "title": "Bad color",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u6", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "tiles",
+              "visuals": [
+                { "kind": "tile", "label": "X", "color": "red", "query": { "sql": "SELECT 1" } }
+              ]
+            }
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "INVALID – table page_size exceeds max",
+        "data": {
+          "title": "Too big page",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u7", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "table",
+              "visuals": [
+                { "kind": "table", "label": "Vehicles", "query": { "sql": "SELECT 1 AS id" }, "options": { "paginate": true, "page_size": 500 } }
+              ]
+            }
+          ]
+        },
+        "valid": false
+      },
+      {
+        "description": "INVALID – chart missing required options",
+        "data": {
+          "title": "Bad chart",
+          "meta": {
+            "schema_version": "1.1.0",
+            "last_updated": "2025-10-24T00:00:00Z",
+            "updated_by": { "id": "u8", "name": "Analyst" }
+          },
+          "rows": [
+            {
+              "type": "charts",
+              "visuals": [
+                { "kind": "bar", "label": "Oops", "query": { "sql": "SELECT 1 AS x" }, "options": { "orientation": "horizontal" } }
+              ]
+            }
+          ]
+        },
+        "valid": false
+      }
+    ]
+  }
+]

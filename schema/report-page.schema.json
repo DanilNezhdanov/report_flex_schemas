@@ -1,0 +1,493 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.navixy.com/report-page.schema.json",
+  "$comment": "SPDX-License-Identifier: MIT",
+  "title": "Navixy Report Page",
+  "description": "Extensible report page composed of rows (tiles, table, annotation, charts). Each visual may carry SQL and optional verification rules.",
+  "type": "object",
+  "required": ["title", "meta", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "subtitle": { "type": "string" },
+    "meta": {
+      "type": "object",
+      "required": ["schema_version", "last_updated", "updated_by"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$", "const": "1.1.0" },
+        "report_id": { "type": "string" },
+        "slug": { "type": "string" },
+        "last_updated": { "type": "string", "format": "date-time" },
+        "updated_by": {
+          "type": "object",
+          "required": ["id", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "email": { "type": "string", "format": "email" }
+          }
+        }
+      }
+    },
+    "datasources": {
+      "description": "Optional named SQL connections; a visual's query may refer to one of these by id.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/datasource" }
+    },
+    "parameters": {
+      "description": "Optional global parameters that visuals may reference.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/parameter" }
+    },
+    "theme": {
+      "description": "Optional page-level design defaults (can be overridden per row/visual).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bg_color": { "$ref": "#/$defs/color" },
+        "font_color": { "$ref": "#/$defs/color" }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/row" }
+    }
+  },
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$" },
+
+    "layout": {
+      "description": "Light-touch layout; 12-col grid span for row content.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "span": { "type": "integer", "minimum": 1, "maximum": 12, "default": 12 },
+        "order": { "type": "integer", "minimum": 0 },
+        "align": { "type": "string", "enum": ["left", "center", "right"], "default": "left" },
+        "responsive": { "type": "boolean", "default": true }
+      }
+    },
+
+    "design": {
+      "description": "Optional design overrides.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bg_color": { "$ref": "#/$defs/color" },
+        "font_color": { "$ref": "#/$defs/color" },
+        "horizontal_rule": { "type": "boolean" },
+        "padding": { "type": "string" },
+        "css_class": { "type": "string" }
+      }
+    },
+
+    "datasource": {
+      "type": "object",
+      "required": ["id", "driver"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "driver": {
+          "type": "string",
+          "enum": ["postgres", "mysql", "mssql", "clickhouse", "sqlite", "snowflake"]
+        },
+        "connection": {
+          "description": "Either an env ref or explicit DSN; implementation chooses which to honor.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "env": { "type": "string" },
+            "dsn": { "type": "string" },
+            "database": { "type": "string" },
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "ssl": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
+    "parameter": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "date", "datetime", "enum"]
+        },
+        "required": { "type": "boolean", "default": false },
+        "default": {},
+        "allowed": { "type": "array", "items": {} },
+        "description": { "type": "string" }
+      }
+    },
+
+    "query": {
+      "type": "object",
+      "required": ["sql"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "data_source_id": { "type": "string" },
+        "sql": { "type": "string", "minLength": 1 },
+        "params": {
+          "description": "Bound values for named params used in SQL (e.g., :start_date). ISO 8601 strings are recommended for date/datetime.",
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "integer" },
+              { "type": "boolean" }
+            ]
+          }
+        },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "row_limit": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "verify": {
+      "description": "Optional automatic checks over the query result.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "row_count": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eq": { "type": "integer", "minimum": 0 },
+            "min": { "type": "integer", "minimum": 0 },
+            "max": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "columns": {
+          "description": "Shape/type guards for expected columns.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/columnRule" }
+        },
+        "value_checks": {
+          "description": "Column-level value constraints.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/valueCheck" }
+        }
+      }
+    },
+
+    "columnRule": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "index": { "type": "integer", "minimum": 0 },
+        "type": {
+          "type": "string",
+          "enum": ["integer", "number", "string", "boolean", "date", "datetime"]
+        },
+        "max_length": { "type": "integer", "minimum": 1 },
+        "nullable": { "type": "boolean", "default": false }
+      }
+    },
+
+    "valueCheck": {
+      "type": "object",
+      "required": ["column"],
+      "additionalProperties": false,
+      "properties": {
+        "column": { "type": "string" },
+        "numeric_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" }
+          }
+        },
+        "regex": { "type": "string" },
+        "allowed_set": { "type": "array", "items": {} },
+        "unique": { "type": "boolean" }
+      }
+    },
+
+    "row": {
+      "oneOf": [
+        { "$ref": "#/$defs/tilesRow" },
+        { "$ref": "#/$defs/tableRow" },
+        { "$ref": "#/$defs/annotationRow" },
+        { "$ref": "#/$defs/chartsRow" }
+      ]
+    },
+
+    "tilesRow": {
+      "type": "object",
+      "required": ["type", "visuals"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "tiles" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "layout": { "$ref": "#/$defs/layout" },
+        "design": { "$ref": "#/$defs/design" },
+        "visuals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": { "$ref": "#/$defs/tileVisual" }
+        }
+      }
+    },
+
+    "tileVisual": {
+      "type": "object",
+      "required": ["kind", "label", "query"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "tile" },
+        "label": { "type": "string" },
+        "hint": { "type": "string" },
+        "color": { "$ref": "#/$defs/color" },
+        "query": { "$ref": "#/$defs/query" },
+        "verify": { "$ref": "#/$defs/verify" },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "prefix": { "type": "string" },
+            "suffix": { "type": "string" },
+            "precision": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "target": { "type": "number" },
+            "show_delta": { "type": "boolean", "default": false },
+            "delta_query": { "$ref": "#/$defs/query" }
+          }
+        }
+      }
+    },
+
+    "tableRow": {
+      "type": "object",
+      "required": ["type", "visuals"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "table" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "layout": { "$ref": "#/$defs/layout" },
+        "design": { "$ref": "#/$defs/design" },
+        "visuals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/tableVisual" }
+        }
+      }
+    },
+
+    "tableVisual": {
+      "type": "object",
+      "required": ["kind", "label", "query"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "table" },
+        "label": { "type": "string" },
+        "hint": { "type": "string" },
+        "color": { "$ref": "#/$defs/color" },
+        "query": { "$ref": "#/$defs/query" },
+        "verify": { "$ref": "#/$defs/verify" },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paginate": { "type": "boolean", "default": true },
+            "page_size": { "type": "integer", "minimum": 1, "maximum": 200, "default": 25 },
+            "columns": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/tableColumn" }
+            }
+          }
+        }
+      }
+    },
+
+    "tableColumn": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string" },
+        "label": { "type": "string" },
+        "align": { "type": "string", "enum": ["left", "center", "right"], "default": "left" },
+        "format": {
+          "type": "string",
+          "enum": ["text", "integer", "decimal", "percent", "currency", "date", "datetime", "duration"]
+        },
+        "precision": { "type": "integer", "minimum": 0, "maximum": 6 },
+        "width": { "oneOf": [{ "type": "integer" }, { "type": "string" }] },
+        "sortable": { "type": "boolean", "default": true },
+        "truncate": { "type": "boolean", "default": true }
+      }
+    },
+
+    "annotationRow": {
+      "type": "object",
+      "required": ["type", "visuals"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "annotation" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "layout": { "$ref": "#/$defs/layout" },
+        "design": { "$ref": "#/$defs/design" },
+        "visuals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/annotationVisual" }
+        }
+      }
+    },
+
+    "annotationVisual": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "annotation" },
+        "label": { "type": "string" },
+        "hint": { "type": "string" },
+        "color": { "$ref": "#/$defs/color" },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "section_name": { "type": "string" },
+            "subtitle": { "type": "string" },
+            "text": { "type": "string" },
+            "markdown": { "type": "boolean", "default": false },
+            "design": { "$ref": "#/$defs/design" }
+          }
+        }
+      }
+    },
+
+    "palette": {
+      "description": "Optional list of colors applied to categories/series in order.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/color" }
+    },
+
+    "chartCommonOptions": {
+      "description": "Shared, minimal charting options.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "category_field": { "type": "string" },
+        "value_field": { "type": "string" },
+        "series_field": { "type": "string", "description": "Optional – for grouped bars later." },
+        "sort_by": { "type": "string", "enum": ["category", "value"], "default": "value" },
+        "sort_dir": { "type": "string", "enum": ["asc", "desc"], "default": "desc" },
+        "top_n": { "type": "integer", "minimum": 1 },
+        "show_legend": { "type": "boolean", "default": true },
+        "legend_position": { "type": "string", "enum": ["top", "right", "bottom", "left", "none"], "default": "right" },
+        "show_tooltips": { "type": "boolean", "default": true },
+        "palette": { "$ref": "#/$defs/palette" }
+      }
+    },
+
+    "barOptions": {
+      "allOf": [
+        { "$ref": "#/$defs/chartCommonOptions" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "orientation": { "type": "string", "enum": ["vertical", "horizontal"], "default": "vertical" },
+            "show_value_labels": { "type": "boolean", "default": false },
+            "precision": { "type": "integer", "minimum": 0, "maximum": 6 }
+          },
+          "required": ["category_field", "value_field"]
+        }
+      ]
+    },
+
+    "pieOptions": {
+      "allOf": [
+        { "$ref": "#/$defs/chartCommonOptions" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "donut": { "type": "boolean", "default": false },
+            "inner_radius": { "type": "number", "minimum": 0, "maximum": 1, "description": "Used if donut=true; 0..1 of outer radius." },
+            "label_type": { "type": "string", "enum": ["percent", "value", "category", "none"], "default": "percent" },
+            "precision": { "type": "integer", "minimum": 0, "maximum": 6 }
+          },
+          "required": ["category_field", "value_field"]
+        }
+      ]
+    },
+
+    "chartsRow": {
+      "type": "object",
+      "required": ["type", "visuals"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "charts" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "layout": { "$ref": "#/$defs/layout" },
+        "design": { "$ref": "#/$defs/design" },
+        "visuals": {
+          "description": "One or more charts; keep it compact on one row.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/barVisual" },
+              { "$ref": "#/$defs/pieVisual" }
+            ]
+          }
+        }
+      }
+    },
+
+    "barVisual": {
+      "type": "object",
+      "required": ["kind", "label", "query", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "bar" },
+        "label": { "type": "string" },
+        "hint": { "type": "string" },
+        "color": { "$ref": "#/$defs/color" },
+        "query": { "$ref": "#/$defs/query" },
+        "verify": { "$ref": "#/$defs/verify" },
+        "options": { "$ref": "#/$defs/barOptions" }
+      }
+    },
+
+    "pieVisual": {
+      "type": "object",
+      "required": ["kind", "label", "query", "options"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "pie" },
+        "label": { "type": "string" },
+        "hint": { "type": "string" },
+        "color": { "$ref": "#/$defs/color" },
+        "query": { "$ref": "#/$defs/query" },
+        "verify": { "$ref": "#/$defs/verify" },
+        "options": { "$ref": "#/$defs/pieOptions" }
+      }
+    }
+  }
+}
